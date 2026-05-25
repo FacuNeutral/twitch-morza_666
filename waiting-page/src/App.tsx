@@ -1,8 +1,20 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tv, VolumeX, Palette, Video, Image, Check, X, RotateCcw, Edit, Plus, Trash2, Settings, ZoomIn, ZoomOut, Type } from 'lucide-react';
+import { Tv, VolumeX, Palette, Video, Image, ImageOff, Check, X, RotateCcw, Edit, Plus, Trash2, Settings, ZoomIn, ZoomOut, Type } from 'lucide-react';
 import mainBg from './assets/main.png';
 import mainVideo from './assets/main.mp4';
+
+// ─── Opciones de fondo disponibles ──────────────────────────────────────────
+const BG_OPTIONS: { name: string; src: string | null }[] = [
+  { name: 'Cocina de Morza', src: mainBg },
+  { name: 'Video de Cocina de Morza', src: mainVideo },
+  { name: 'Sin fondo', src: null },
+];
+
+function isVideoSrc(src: string | null) {
+  if (!src) return false;
+  return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(src);
+}
 
 // Pasos por defecto del menú central
 const DEFAULT_STEPS = [
@@ -299,10 +311,12 @@ export default function App() {
   const [textColor, setTextColor] = useState(() => {
     return localStorage.getItem('mc_textColor') || '#FF2E2E';
   });
-  const [useVideoBg, setUseVideoBg] = useState(() => {
-    const val = localStorage.getItem('mc_useVideoBg');
-    return val !== null ? val === 'true' : false;
+  const [bgIndex, setBgIndex] = useState(() => {
+    const val = localStorage.getItem('mc_bgIndex');
+    return val !== null ? parseInt(val, 10) : 0;
   });
+  const currentBg = BG_OPTIONS[bgIndex] ?? BG_OPTIONS[0];
+  const useVideoBg = isVideoSrc(currentBg.src);
 
   const [steps, setSteps] = useState<typeof DEFAULT_STEPS>(() => {
     const saved = localStorage.getItem('mc_steps');
@@ -349,8 +363,8 @@ export default function App() {
   }, [textColor]);
 
   useEffect(() => {
-    localStorage.setItem('mc_useVideoBg', String(useVideoBg));
-  }, [useVideoBg]);
+    localStorage.setItem('mc_bgIndex', String(bgIndex));
+  }, [bgIndex]);
 
   useEffect(() => {
     localStorage.setItem('mc_titleSize', titleSize);
@@ -404,6 +418,7 @@ export default function App() {
   const [showConfigMenu, setShowConfigMenu] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [tempColor, setTempColor] = useState(textColor);
+  const [showBgModal, setShowBgModal] = useState(false);
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [tempPhrases, setTempPhrases] = useState<string[]>([]);
   const [tempTitleSize, setTempTitleSize] = useState<'S' | 'M' | 'L'>(titleSize);
@@ -494,9 +509,9 @@ export default function App() {
     const handleMouseMove = () => {
       setShowControls(true);
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-      const hideDelay = showConfigMenu || showColorModal || showStepsModal || showTitlesModal ? 10000 : 2500;
+      const hideDelay = showConfigMenu || showColorModal || showStepsModal || showTitlesModal || showBgModal ? 10000 : 2500;
       hideControlsTimer.current = setTimeout(() => {
-        if (!showConfigMenu && !showColorModal && !showStepsModal && !showTitlesModal) {
+        if (!showConfigMenu && !showColorModal && !showStepsModal && !showTitlesModal && !showBgModal) {
           setShowControls(false);
         }
       }, hideDelay);
@@ -506,7 +521,7 @@ export default function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     };
-  }, [showColorModal, showConfigMenu, showStepsModal, showTitlesModal]);
+  }, [showColorModal, showConfigMenu, showStepsModal, showTitlesModal, showBgModal]);
 
   // Atajo de teclado Ctrl+Shift+R para resetear el contador
   useEffect(() => {
@@ -551,10 +566,10 @@ export default function App() {
           {/* 1. IMAGEN O VIDEO DE FONDO: 100% de la pantalla, NO RECORTADA */}
           <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden rounded-[2.5rem]">
             {/* Animación de vibración de distorsión cromática / temblor analógico de TV antigua usando Framer motion */}
-            {useVideoBg ? (
+            {currentBg.src && (useVideoBg ? (
               <motion.video
                 ref={videoRef}
-                src={mainVideo}
+                src={currentBg.src}
                 className="w-full h-full object-cover pointer-events-none opacity-85 select-none rounded-[2.5rem]"
                 muted
                 playsInline
@@ -578,7 +593,7 @@ export default function App() {
               />
             ) : (
               <motion.img
-                src={mainBg}
+                src={currentBg.src!}
                 alt="Main Background"
                 className="w-full object-container pointer-events-none opacity-85 select-none rounded-[1rem]"
                 style={{borderRadius: '1rem'}}
@@ -599,7 +614,7 @@ export default function App() {
                   ease: "linear"
                 }}
               />
-            )}
+            ))}
           </div>
 
           {/* 2. EFECTOS RETRO CRT SOBRE LA IMAGEN */}
@@ -764,7 +779,7 @@ export default function App() {
                 {/* Fondo (Video/Foto) y Reset Contador */}
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => setUseVideoBg(!useVideoBg)}
+                    onClick={() => { setShowBgModal(true); setShowConfigMenu(false); }}
                     className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                     style={{
                       borderColor: textColor,
@@ -772,7 +787,7 @@ export default function App() {
                     }}
                   >
                     {useVideoBg ? <Video className="w-4 h-4" /> : <Image className="w-4 h-4" />}
-                    <span>FONDO: {useVideoBg ? 'VIDEO' : 'FOTO'}</span>
+                    <span>FONDO</span>
                   </button>
 
                   <button
@@ -869,6 +884,69 @@ export default function App() {
                 </button>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE SELECCIÓN DE FONDO */}
+      <AnimatePresence>
+        {showBgModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="border p-6 w-full max-w-sm rounded-2xl shadow-2xl bg-black"
+              style={{
+                borderColor: textColor,
+                color: '#ffffff',
+                boxShadow: `0 0 25px ${textColor}40`,
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b pb-3 mb-5" style={{ borderColor: `${textColor}33` }}>
+                <div className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Image className="w-4 h-4" />
+                  <span>SELECCIONAR FONDO</span>
+                </div>
+                <button
+                  onClick={() => setShowBgModal(false)}
+                  className="p-1 rounded-md border transition-all cursor-pointer bg-black"
+                  style={{ borderColor: textColor, color: '#ffffff' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Opciones */}
+              <div className="flex flex-col gap-3">
+                {BG_OPTIONS.map((opt, index) => {
+                  const isVideo = isVideoSrc(opt.src);
+                  const isSelected = bgIndex === index;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => { setBgIndex(index); setShowBgModal(false); }}
+                      className="flex items-center gap-3 py-3 px-4 rounded-xl border text-sm font-bold tracking-wider transition-all cursor-pointer bg-black"
+                      style={{
+                        borderColor: isSelected ? textColor : `${textColor}44`,
+                        color: isSelected ? '#000000' : '#ffffff',
+                        backgroundColor: isSelected ? textColor : 'transparent',
+                      }}
+                    >
+                      {opt.src === null
+                        ? <ImageOff className="w-4 h-4 flex-none" />
+                        : isVideo
+                          ? <Video className="w-4 h-4 flex-none" />
+                          : <Image className="w-4 h-4 flex-none" />}
+                      <span className="flex-1 text-left">{opt.name}</span>
+                      {isSelected && <Check className="w-4 h-4 flex-none" strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
           </div>
         )}

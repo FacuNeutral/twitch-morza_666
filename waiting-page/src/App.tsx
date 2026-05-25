@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tv, VolumeX, Palette, Video, Image, Check, X, RotateCcw, Edit, Plus, Trash2, Settings } from 'lucide-react';
+import { Tv, VolumeX, Palette, Video, Image, Check, X, RotateCcw, Edit, Plus, Trash2, Settings, ZoomIn, ZoomOut, Type } from 'lucide-react';
 import mainBg from './assets/main.png';
 import mainVideo from './assets/main.mp4';
 
@@ -328,6 +328,11 @@ export default function App() {
     return (val === 'S' || val === 'M' || val === 'L') ? val : 'M';
   });
 
+  const [zoom, setZoom] = useState<number>(() => {
+    const val = localStorage.getItem('mc_zoom');
+    return val ? parseFloat(val) : 1;
+  });
+
   const shakeAndFlash = useMemo(() => {
     const val = localStorage.getItem('mc_shakeAndFlash');
     return val !== null ? val === 'true' : true;
@@ -351,6 +356,10 @@ export default function App() {
     localStorage.setItem('mc_titleSize', titleSize);
   }, [titleSize]);
 
+  useEffect(() => {
+    localStorage.setItem('mc_zoom', String(zoom));
+  }, [zoom]);
+
   const titleSizeClass = titleSize === 'S'
     ? 'text-xs md:text-sm lg:text-base'
     : titleSize === 'L'
@@ -364,15 +373,28 @@ export default function App() {
   const [dateStr, setDateStr] = useState('20 MAY 2026');
   const [phrase, setPhrase] = useState('REGRESO EN UN MOMENTO...');
 
+  const [phrases, setPhrases] = useState<string[]>(() => {
+    const saved = localStorage.getItem('mc_phrases');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return ['REGRESO EN UN MOMENTO...', 'ME FUI A HACER UN MATECITO'];
+  });
+
   useEffect(() => {
-    const phrases = ['REGRESO EN UN MOMENTO...', 'ME FUI A HACER UN MATECITO'];
+    localStorage.setItem('mc_phrases', JSON.stringify(phrases));
+  }, [phrases]);
+
+  useEffect(() => {
+    if (phrases.length === 0) return;
+    setPhrase(phrases[0]);
     let index = 0;
     const interval = setInterval(() => {
       index = (index + 1) % phrases.length;
       setPhrase(phrases[index]);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [phrases]);
 
   // Custom states for TV control
   const [isTvOn, setIsTvOn] = useState(true);
@@ -382,6 +404,9 @@ export default function App() {
   const [showConfigMenu, setShowConfigMenu] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [tempColor, setTempColor] = useState(textColor);
+  const [showTitlesModal, setShowTitlesModal] = useState(false);
+  const [tempPhrases, setTempPhrases] = useState<string[]>([]);
+  const [tempTitleSize, setTempTitleSize] = useState<'S' | 'M' | 'L'>(titleSize);
 
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -469,9 +494,9 @@ export default function App() {
     const handleMouseMove = () => {
       setShowControls(true);
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-      const hideDelay = showConfigMenu || showColorModal || showStepsModal ? 10000 : 2500;
+      const hideDelay = showConfigMenu || showColorModal || showStepsModal || showTitlesModal ? 10000 : 2500;
       hideControlsTimer.current = setTimeout(() => {
-        if (!showConfigMenu && !showColorModal && !showStepsModal) {
+        if (!showConfigMenu && !showColorModal && !showStepsModal && !showTitlesModal) {
           setShowControls(false);
         }
       }, hideDelay);
@@ -481,7 +506,7 @@ export default function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     };
-  }, [showColorModal, showConfigMenu, showStepsModal]);
+  }, [showColorModal, showConfigMenu, showStepsModal, showTitlesModal]);
 
   // Atajo de teclado Ctrl+Shift+R para resetear el contador
   useEffect(() => {
@@ -631,7 +656,7 @@ export default function App() {
                 )}
 
                 {/* EL CARTEL DE VIDRIO EN EL CENTRO EXACTO (ESTILO SEGA) */}
-                <div className="relative z-40 flex flex-col items-center justify-center gap-6">
+                <div className="relative z-40 flex flex-col items-center justify-center gap-6" style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}>
                   {/* Menú Sega */}
                   <SegaMenu textColor={textColor} resetKey={resetKey} steps={steps} />
                 </div>
@@ -660,7 +685,7 @@ export default function App() {
           className="flex items-center gap-3 px-8 py-4 text-sm md:text-base font-bold bg-black border rounded-lg shadow-2xl transition-all duration-200 cursor-pointer"
           style={{
             borderColor: textColor,
-            color: textColor,
+            color: '#ffffff',
             boxShadow: `0 0 15px ${textColor}44`
           }}
         >
@@ -680,7 +705,7 @@ export default function App() {
               className="border p-6 w-full max-w-lg rounded-2xl shadow-2xl bg-black"
               style={{
                 borderColor: textColor,
-                color: textColor,
+                color: '#ffffff',
                 boxShadow: `0 0 25px ${textColor}40`,
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
@@ -696,7 +721,7 @@ export default function App() {
                   className="p-1.5 rounded-md border transition-all cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   <X className="w-4 h-4" />
@@ -715,7 +740,7 @@ export default function App() {
                     className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                     style={{
                       borderColor: textColor,
-                      color: isTvOn ? '#000000' : textColor,
+                      color: isTvOn ? '#000000' : '#ffffff',
                       backgroundColor: isTvOn ? textColor : 'transparent',
                     }}
                   >
@@ -728,7 +753,7 @@ export default function App() {
                     className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                     style={{
                       borderColor: textColor,
-                      color: showVcrMenu ? '#000000' : textColor,
+                      color: showVcrMenu ? '#000000' : '#ffffff',
                       backgroundColor: showVcrMenu ? textColor : 'transparent',
                     }}
                   >
@@ -743,7 +768,7 @@ export default function App() {
                     className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                     style={{
                       borderColor: textColor,
-                      color: textColor,
+                      color: '#ffffff',
                     }}
                   >
                     {useVideoBg ? <Video className="w-4 h-4" /> : <Image className="w-4 h-4" />}
@@ -758,7 +783,7 @@ export default function App() {
                     className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                     style={{
                       borderColor: textColor,
-                      color: textColor,
+                      color: '#ffffff',
                     }}
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -766,28 +791,25 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Selector de escala de título */}
-                <div className="border p-4 rounded-xl flex flex-col gap-2" style={{ borderColor: `${textColor}33` }}>
-                  <span className="text-xs font-bold uppercase tracking-wider block text-center">TAMAÑO DEL TÍTULO</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['S', 'M', 'L'] as const).map((size) => {
-                      const isSelected = titleSize === size;
-                      return (
-                        <button
-                          key={size}
-                          onClick={() => setTitleSize(size)}
-                          className="py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer bg-black"
-                          style={{
-                            borderColor: textColor,
-                            color: isSelected ? '#000000' : textColor,
-                            backgroundColor: isSelected ? textColor : 'transparent',
-                          }}
-                        >
-                          {size}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* Zoom + / Zoom - */}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setZoom(z => Math.max(parseFloat((z - 0.1).toFixed(1)), 0.3))}
+                    className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
+                    style={{ borderColor: textColor, color: '#ffffff' }}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                    <span>ZOOM - ({zoom.toFixed(1)}x)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setZoom(z => Math.min(parseFloat((z + 0.1).toFixed(1)), 3))}
+                    className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
+                    style={{ borderColor: textColor, color: '#ffffff' }}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                    <span>ZOOM + ({zoom.toFixed(1)}x)</span>
+                  </button>
                 </div>
 
               </div>
@@ -804,7 +826,7 @@ export default function App() {
                   className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   <Palette className="w-4 h-4" />
@@ -821,11 +843,29 @@ export default function App() {
                   className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   <Edit className="w-4 h-4" />
                   <span>EDITAR PASOS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempPhrases([...phrases]);
+                    setTempTitleSize(titleSize);
+                    setShowTitlesModal(true);
+                    setShowConfigMenu(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs font-bold tracking-wider transition-all cursor-pointer bg-black"
+                  style={{
+                    borderColor: textColor,
+                    color: '#ffffff'
+                  }}
+                >
+                  <Type className="w-4 h-4" />
+                  <span>AJUSTAR TÍTULOS</span>
                 </button>
               </div>
 
@@ -845,7 +885,7 @@ export default function App() {
               className="border p-6 w-full max-w-sm rounded-2xl shadow-2xl bg-black"
               style={{
                 borderColor: textColor,
-                color: textColor,
+                color: '#ffffff',
                 boxShadow: `0 0 25px ${textColor}40`,
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
@@ -861,7 +901,7 @@ export default function App() {
                   className="p-1 rounded-md border transition-all cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   <X className="w-4 h-4" />
@@ -893,7 +933,7 @@ export default function App() {
                             boxShadow: `0 0 8px ${preset.value}40`
                           }}
                         />
-                        <span className="text-[9px] font-medium truncate w-full text-center mt-1" style={{ color: textColor }}>
+                        <span className="text-[9px] font-medium truncate w-full text-center mt-1" style={{ color: '#ffffff' }}>
                           {preset.name}
                         </span>
                         {isSelected && (
@@ -919,7 +959,7 @@ export default function App() {
                       className="w-full pl-8 pr-3 py-1.5 bg-black border rounded-md text-xs font-mono focus:outline-none"
                       style={{
                         borderColor: textColor,
-                        color: textColor
+                        color: '#ffffff'
                       }}
                       value={tempColor.toUpperCase()}
                       onChange={(e) => {
@@ -930,7 +970,7 @@ export default function App() {
                       }}
                       placeholder="#FF2E2E"
                     />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: `${textColor}88` }}>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: '#ffffff88' }}>
                       #
                     </span>
                   </div>
@@ -955,7 +995,7 @@ export default function App() {
                   className="px-3 py-1.5 text-xs font-semibold rounded-md border transition duration-150 cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   Cancelar
@@ -985,7 +1025,7 @@ export default function App() {
       {/* MODAL DE EDICIÓN DE PASOS DEL MENÚ CENTRAL */}
       <AnimatePresence>
         {showStepsModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -993,7 +1033,7 @@ export default function App() {
               className="border p-6 w-full max-w-xl rounded-2xl shadow-2xl bg-black"
               style={{
                 borderColor: textColor,
-                color: textColor,
+                color: '#ffffff',
                 boxShadow: `0 0 25px ${textColor}40`,
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
@@ -1009,7 +1049,7 @@ export default function App() {
                   className="p-1 rounded-md border transition-all cursor-pointer bg-black"
                   style={{
                     borderColor: textColor,
-                    color: textColor
+                    color: '#ffffff'
                   }}
                 >
                   <X className="w-4 h-4" />
@@ -1029,7 +1069,7 @@ export default function App() {
                       className="flex-1 min-w-0 px-2.5 py-1.5 bg-black border rounded-md text-xs focus:outline-none"
                       style={{
                         borderColor: textColor,
-                        color: textColor
+                        color: '#ffffff'
                       }}
                       value={step.label}
                       onChange={(e) => {
@@ -1048,7 +1088,7 @@ export default function App() {
                         className="w-16 px-2 py-1.5 bg-black border rounded-md text-xs text-center focus:outline-none font-mono"
                         style={{
                           borderColor: textColor,
-                          color: textColor
+                          color: '#ffffff'
                         }}
                         value={step.duration}
                         onChange={(e) => {
@@ -1071,7 +1111,7 @@ export default function App() {
                       className="p-1.5 rounded disabled:opacity-40 transition-colors cursor-pointer bg-black border"
                       style={{
                         borderColor: textColor,
-                        color: textColor
+                        color: '#ffffff'
                       }}
                       title="Eliminar paso"
                     >
@@ -1095,7 +1135,7 @@ export default function App() {
                     className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-md transition duration-150 cursor-pointer bg-black border"
                     style={{
                       borderColor: textColor,
-                      color: textColor
+                      color: '#ffffff'
                     }}
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1111,7 +1151,7 @@ export default function App() {
                   onClick={() => setTempSteps(JSON.parse(JSON.stringify(DEFAULT_STEPS)))}
                   className="px-3 py-1.5 text-xs rounded-md transition duration-150 cursor-pointer bg-black border border-red-500/50 hover:bg-red-500/10"
                   style={{
-                    color: textColor
+                    color: '#ffffff'
                   }}
                   title="Restablecer a pasos originales"
                 >
@@ -1149,6 +1189,132 @@ export default function App() {
                 </div>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE AJUSTE DE TÍTULOS */}
+      <AnimatePresence>
+        {showTitlesModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="border p-6 w-full max-w-md rounded-2xl shadow-2xl bg-black"
+              style={{
+                borderColor: textColor,
+                color: '#ffffff',
+                boxShadow: `0 0 25px ${textColor}40`,
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b pb-3 mb-4" style={{ borderColor: `${textColor}33` }}>
+                <div className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Type className="w-4 h-4" />
+                  <span>AJUSTAR TÍTULOS</span>
+                </div>
+                <button
+                  onClick={() => setShowTitlesModal(false)}
+                  className="p-1 rounded-md border transition-all cursor-pointer bg-black"
+                  style={{ borderColor: textColor, color: '#ffffff' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tamaño del título */}
+              <div className="mb-5">
+                <span className="block text-xs font-bold uppercase tracking-wider mb-2">TAMAÑO DEL TÍTULO</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['S', 'M', 'L'] as const).map((size) => {
+                    const isSelected = tempTitleSize === size;
+                    return (
+                      <button
+                        key={size}
+                        onClick={() => setTempTitleSize(size)}
+                        className="py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer bg-black"
+                        style={{
+                          borderColor: textColor,
+                          color: isSelected ? '#000000' : '#ffffff',
+                          backgroundColor: isSelected ? textColor : 'transparent',
+                        }}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Frases rotativas */}
+              <div className="mb-4 border-t pt-4" style={{ borderColor: `${textColor}33` }}>
+                <span className="block text-xs font-bold uppercase tracking-wider mb-2">FRASES ROTATIVAS</span>
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                  {tempPhrases.map((p, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        className="flex-1 px-2.5 py-1.5 bg-black border rounded-md text-xs focus:outline-none"
+                        style={{ borderColor: textColor, color: '#ffffff' }}
+                        value={p}
+                        onChange={(e) => {
+                          const updated = [...tempPhrases];
+                          updated[i] = e.target.value;
+                          setTempPhrases(updated);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={tempPhrases.length <= 1}
+                        onClick={() => setTempPhrases(tempPhrases.filter((_, idx) => idx !== i))}
+                        className="p-1.5 rounded border disabled:opacity-40 cursor-pointer bg-black"
+                        style={{ borderColor: textColor, color: '#ffffff' }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {tempPhrases.length < 8 && (
+                  <button
+                    type="button"
+                    onClick={() => setTempPhrases([...tempPhrases, ''])}
+                    className="mt-2 flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border cursor-pointer bg-black"
+                    style={{ borderColor: textColor, color: '#ffffff' }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir frase</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Acciones */}
+              <div className="flex justify-end gap-2 border-t pt-3" style={{ borderColor: `${textColor}33` }}>
+                <button
+                  type="button"
+                  onClick={() => setShowTitlesModal(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md border cursor-pointer bg-black"
+                  style={{ borderColor: textColor, color: '#ffffff' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleSize(tempTitleSize);
+                    setPhrases(tempPhrases.filter(p => p.trim() !== ''));
+                    setShowTitlesModal(false);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer"
+                  style={{ backgroundColor: textColor, color: '#000000' }}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Aplicar Cambios</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
